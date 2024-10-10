@@ -55,13 +55,14 @@ const registerUser = asyncHandler(async (req, res) => {
 
   // Return user data with a 201 success status
   if (user) {
+    const { _id, name, email, photo, phone, bio } = user;
     res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      photo: user.photo,
-      phone: user.phone,
-      bio: user.bio,
+      _id,
+      name,
+      email,
+      photo,
+      phone,
+      bio,
       token,
     });
   } else {
@@ -71,5 +72,69 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 // Login User
+const loginUser = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
 
-module.exports = { registerUser };
+  // Validate Request
+  if (!email || !password) {
+    res.status(400);
+    throw new Error("Please add email and password");
+  }
+
+  // Check if user exists
+  const user = await User.findOne({ email });
+  if (!user) {
+    res.status(400);
+    throw new Error("User not found, please signup");
+  }
+
+  // User exists, check if password is correct
+  const passwordIsCorrect = await bcrypt.compare(password, user.password);
+
+  // Generate Token
+  const token = generateToken(user._id);
+
+  // Send HTTP-only cookie
+  res.cookie("token", token, {
+    path: "/",
+    httpOnly: true,
+    expires: new Date(Date.now() + 1000 * 86400), // 1Day
+    sameSite: "none",
+    secure: process.env.NODE_ENV === "devlopment",
+  });
+
+  if (user && passwordIsCorrect) {
+    const { _id, name, email, photo, phone, bio } = user;
+    res.status(200).json({
+      _id,
+      name,
+      email,
+      photo,
+      phone,
+      bio,
+      token,
+    });
+  } else {
+    res.status(400);
+    throw new Error("Invalid email or password");
+  }
+});
+
+// Logout User
+const logout = asyncHandler(async (req, res) => {
+  res.cookie("token", "", {
+    path: "/",
+    httpOnly: true,
+    expires: new Date(0), // 1Day
+    sameSite: "none",
+    secure: process.env.NODE_ENV === "devlopment",
+  });
+  return res.status(200).json({ message: "Successfully Logged Out" });
+});
+
+// Get User Data
+const getUser = asyncHandler(async (req, res) => {
+  res.send("Get User Data");
+});
+
+module.exports = { registerUser, loginUser, logout, getUser };
